@@ -39,10 +39,12 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,6 +54,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.shape.CircleShape
+
+val MainBackgroundColor = Color(0xFF121212)
+val BottomSheetBackgroundColor = Color(0xFF252525)
+val orchidAccent = Color(0x733C2A40)
+val SoftLime = Color(0x73243328)
+val DarkLime = Color(0xFFE6F809)
+val DarkOrchid = Color(0xFFCF94F0)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,7 +69,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PasswordManagerTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    containerColor = MainBackgroundColor
+                ) { innerPadding ->
                     MainScreen(modifier = Modifier.padding(innerPadding))
                 }
             }
@@ -77,10 +90,11 @@ fun MainScreen(
     var selectedEntry by remember { mutableStateOf<PasswordEntry?>(null) }
     var showDetailsDialog by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val addSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val passwordList by viewModel.passwords.collectAsState()
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize().background(MainBackgroundColor)) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -88,11 +102,20 @@ fun MainScreen(
             contentPadding = PaddingValues(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(passwordList) { entry ->
+            itemsIndexed(passwordList) { index, entry ->
+                val cardColor = if (index % 2 == 0) orchidAccent else SoftLime
+                val arrowColor = if (index % 2 == 0) DarkOrchid else DarkLime
                 Card(
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(2.dp)
+                    shape = RoundedCornerShape(15.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            onClick = {
+                                selectedEntry = entry
+                                showDetailsDialog = true
+                            }
+                        ),
+                    colors = CardDefaults.cardColors(containerColor = cardColor)
                 ) {
                     Row(
                         modifier = Modifier
@@ -105,7 +128,8 @@ fun MainScreen(
                                 text = entry.accountType,
                                 style = MaterialTheme.typography.titleMedium,
                                 maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
+                                color = Color.White
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
@@ -115,26 +139,22 @@ fun MainScreen(
                             )
                         }
                         Icon(
-                            imageVector = Icons.Filled.Add,
+                            imageVector = Icons.Filled.KeyboardArrowRight,
                             contentDescription = "Details",
-                            tint = Color.LightGray,
+                            tint = arrowColor,
                             modifier = Modifier
                                 .padding(start = 8.dp)
-                                .clickable {
-                                    selectedEntry = entry
-                                    showDetailsDialog = true
-                                }
                         )
                     }
                 }
             }
         }
 
-        // Floating Action Button at bottom right
         androidx.compose.material3.FloatingActionButton(
             onClick = { showAddDialog = true },
-            containerColor = Color(0xFF2196F3),
-            contentColor = Color.White,
+            containerColor = DarkLime,
+            contentColor = BottomSheetBackgroundColor,
+            shape = CircleShape,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(24.dp)
@@ -146,11 +166,12 @@ fun MainScreen(
         }
 
         if (showAddDialog) {
-            AddPasswordDialog(
+            AddPasswordBottomSheet(
                 onAdd = { newEntry ->
                     viewModel.addPassword(newEntry)
                 },
-                onDismiss = { showAddDialog = false }
+                onDismiss = { showAddDialog = false },
+                sheetState = addSheetState
             )
         }
 
@@ -184,55 +205,67 @@ fun MainScreenPreview() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddPasswordDialog(
+fun AddPasswordBottomSheet(
     onAdd: (PasswordEntry) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    sheetState: SheetState
 ) {
     var accountType by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color.White
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = BottomSheetBackgroundColor,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Text(
+                text = "Add New Account",
+                color = DarkLime,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(Modifier.height(16.dp))
+            TextField(
+                value = accountType,
+                onValueChange = { accountType = it },
+                label = { Text("Account Name") },
+                singleLine = true
+            )
+            Spacer(Modifier.height(12.dp))
+            TextField(
+                value = username,
+                onValueChange = { username = it },
+                label = { Text("Username/Email") },
+                singleLine = true
+            )
+            Spacer(Modifier.height(12.dp))
+            TextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Password") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation()
+            )
+            Spacer(Modifier.height(24.dp))
+            Button(
+                onClick = {
+                    onAdd(PasswordEntry(accountType = accountType, username = username, password = password))
+                    onDismiss()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = DarkLime,
+                    contentColor = BottomSheetBackgroundColor
+                )
             ) {
-                TextField(
-                    value = accountType,
-                    onValueChange = { accountType = it },
-                    label = { Text("Account Name") },
-                    singleLine = true
-                )
-                Spacer(Modifier.height(12.dp))
-                TextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = { Text("Username/Email") },
-                    singleLine = true
-                )
-                Spacer(Modifier.height(12.dp))
-                TextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Password") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation()
-                )
-                Spacer(Modifier.height(24.dp))
-                Button(
-                    onClick = {
-                        onAdd(PasswordEntry(accountType = accountType, username = username, password = password))
-                        onDismiss()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Add New Account")
-                }
+                Text("Add New Account")
             }
         }
     }
@@ -255,7 +288,7 @@ fun PasswordDetailsBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color.White,
+        containerColor = BottomSheetBackgroundColor,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
         Column(
@@ -264,7 +297,7 @@ fun PasswordDetailsBottomSheet(
         ) {
             Text(
                 text = "Account Details",
-                color = Color(0xFF2196F3),
+                color = DarkLime,
                 style = MaterialTheme.typography.titleMedium
             )
             Spacer(Modifier.height(16.dp))
@@ -293,14 +326,14 @@ fun PasswordDetailsBottomSheet(
             } else {
                 Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
                     Text("Account Type", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-                    Text(accountType, style = MaterialTheme.typography.bodyLarge)
+                    Text(accountType, style = MaterialTheme.typography.bodyLarge, color = Color.White)
                     Spacer(Modifier.height(8.dp))
                     Text("Username/ Email", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-                    Text(username, style = MaterialTheme.typography.bodyLarge)
+                    Text(username, style = MaterialTheme.typography.bodyLarge, color = Color.White)
                     Spacer(Modifier.height(8.dp))
                     Text("Password", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("******", style = MaterialTheme.typography.bodyLarge)
+                        Text("******", style = MaterialTheme.typography.bodyLarge, color = Color.White)
                     }
                 }
             }
@@ -320,8 +353,8 @@ fun PasswordDetailsBottomSheet(
                     },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isEditing) Color(0xFF2196F3) else Color.Black,
-                        contentColor = Color.White
+                        containerColor = if (isEditing) DarkLime else DarkOrchid,
+                        contentColor = if (isEditing) BottomSheetBackgroundColor else Color.White,
                     )
                 ) {
                     Text(if (isEditing) "Save" else "Edit")
