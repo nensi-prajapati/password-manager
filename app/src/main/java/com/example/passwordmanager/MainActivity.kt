@@ -55,6 +55,15 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.input.VisualTransformation
+
 
 val MainBackgroundColor = Color(0xFF121212)
 val BottomSheetBackgroundColor = Color(0xFF252525)
@@ -95,10 +104,28 @@ fun MainScreen(
     val passwordList by viewModel.passwords.collectAsState()
 
     Box(modifier = modifier.fillMaxSize().background(MainBackgroundColor)) {
+        Text(
+            text = "Password Manager",
+            color = Color.White,
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 24.dp, top = 24.dp, bottom = 8.dp)
+        )
+
+        if (passwordList.isEmpty()) {
+            Text(
+                text = "Click + button to add data",
+                color = Color.Gray,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                .padding(top = 64.dp, start = 16.dp, end = 16.dp),
             contentPadding = PaddingValues(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -216,6 +243,15 @@ fun AddPasswordBottomSheet(
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
+    var showError by remember { mutableStateOf(false) }
+
+    val isFormValid = accountType.isNotBlank() &&
+            username.isNotBlank() &&
+            password.isNotBlank() &&
+            (isValidEmail(username) || isValidUsername(username))
+
+    val passwordStrength = getPasswordStrength(password)
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -226,50 +262,181 @@ fun AddPasswordBottomSheet(
             modifier = Modifier.padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "Add New Account",
-                color = DarkLime,
-                style = MaterialTheme.typography.titleMedium
-            )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
             TextField(
                 value = accountType,
                 onValueChange = { accountType = it },
                 label = { Text("Account Name") },
-                singleLine = true
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White, RoundedCornerShape(12.dp)),
+                colors = TextFieldDefaults.textFieldColors(
+                    containerColor = Color.White,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent
+                ),
+                shape = RoundedCornerShape(12.dp)
             )
-            Spacer(Modifier.height(12.dp))
+
+            Spacer(Modifier.height(16.dp))
             TextField(
                 value = username,
                 onValueChange = { username = it },
-                label = { Text("Username/Email") },
-                singleLine = true
+                label = { Text("Username / Email") },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White, RoundedCornerShape(12.dp)),
+                colors = TextFieldDefaults.textFieldColors(
+                    containerColor = Color.White,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent
+                ),
+                shape = RoundedCornerShape(12.dp)
             )
-            Spacer(Modifier.height(12.dp))
+
+            Spacer(Modifier.height(16.dp))
+            var isPasswordVisible by remember { mutableStateOf(false) }
+
             TextField(
                 value = password,
                 onValueChange = { password = it },
                 label = { Text("Password") },
                 singleLine = true,
-                visualTransformation = PasswordVisualTransformation()
-            )
-            Spacer(Modifier.height(24.dp))
-            Button(
-                onClick = {
-                    onAdd(PasswordEntry(accountType = accountType, username = username, password = password))
-                    onDismiss()
+                visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    val image = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                    IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                        Icon(imageVector = image, contentDescription = if (isPasswordVisible) "Hide password" else "Show password")
+                    }
                 },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = DarkLime,
-                    contentColor = BottomSheetBackgroundColor
-                )
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White, RoundedCornerShape(12.dp)),
+                colors = TextFieldDefaults.textFieldColors(
+                    containerColor = Color.White,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent
+                ),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+
+            // Password generator button
+            TextButton(
+                onClick = { password = generateSecurePassword() },
+                modifier = Modifier.align(Alignment.End)
             ) {
-                Text("Add New Account")
+                Text("Generate Strong Password", style = MaterialTheme.typography.bodySmall, color = DarkOrchid)
+            }
+
+            // Password strength meter
+            if (password.isNotBlank()) {
+                val (label, color) = when (passwordStrength) {
+                    PasswordStrength.WEAK -> "Weak" to Color.Red
+                    PasswordStrength.MEDIUM -> "Medium" to Color(0xFFFFA000) // Amber
+                    PasswordStrength.STRONG -> "Strong" to Color(0xFF4CAF50) // Green
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    LinearProgressIndicator(
+                        progress = when (passwordStrength) {
+                            PasswordStrength.WEAK -> 0.33f
+                            PasswordStrength.MEDIUM -> 0.66f
+                            PasswordStrength.STRONG -> 1f
+                        },
+                        color = color,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(label, color = color, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            if (showError && !isFormValid) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "Please fill all fields. Enter a valid username or email.",
+                    color = Color.Red,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+            }
+
+            Spacer(Modifier.height(32.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 32.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Button(
+                    onClick = {
+                        if (isFormValid) {
+                            onAdd(PasswordEntry(accountType = accountType, username = username, password = password))
+                            onDismiss()
+                        } else {
+                            showError = true
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = DarkLime, contentColor = BottomSheetBackgroundColor)
+                ) {
+                    Text("Save", style = MaterialTheme.typography.titleMedium)
+                }
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(28.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = DarkOrchid, contentColor = Color.White)
+                ) {
+                    Text("Delete")
+                }
             }
         }
     }
 }
+
+fun isValidEmail(email: String): Boolean {
+    return android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
+}
+
+fun isValidUsername(username: String): Boolean {
+    val usernameRegex = "^[a-zA-Z0-9._]{3,30}$"
+    return Regex(usernameRegex).matches(username)
+}
+
+enum class PasswordStrength { WEAK, MEDIUM, STRONG }
+
+fun getPasswordStrength(password: String): PasswordStrength {
+    var score = 0
+    if (password.length >= 8) score++
+    if (password.any { it.isDigit() }) score++
+    if (password.any { it.isUpperCase() }) score++
+    if (password.any { "!@#\$%^&*()_+-=[]{}|;:',.<>?/".contains(it) }) score++
+
+    return when (score) {
+        0, 1 -> PasswordStrength.WEAK
+        2, 3 -> PasswordStrength.MEDIUM
+        else -> PasswordStrength.STRONG
+    }
+}
+
+fun generateSecurePassword(length: Int = 12): String {
+    val allowedChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#\$%^&*()_+-=[]{}|;:,.<>?"
+    return (1..length)
+        .map { allowedChars.random() }
+        .joinToString("")
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -284,6 +451,14 @@ fun PasswordDetailsBottomSheet(
     var accountType by remember { mutableStateOf(entry.accountType) }
     var username by remember { mutableStateOf(entry.username) }
     var password by remember { mutableStateOf(entry.password) }
+    var showError by remember { mutableStateOf(false) }
+    var isPasswordVisible by remember { mutableStateOf(false) }
+
+    val isFormValid = accountType.isNotBlank() &&
+            username.isNotBlank() &&
+            password.isNotBlank() &&
+            (isValidEmail(username) || isValidUsername(username))
+    val passwordStrength = getPasswordStrength(password)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -306,23 +481,130 @@ fun PasswordDetailsBottomSheet(
                     value = accountType,
                     onValueChange = { accountType = it },
                     label = { Text("Account Type") },
-                    singleLine = true
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White, RoundedCornerShape(12.dp)),
+                    colors = TextFieldDefaults.textFieldColors(
+                        containerColor = Color.White,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(16.dp))
                 TextField(
                     value = username,
                     onValueChange = { username = it },
-                    label = { Text("Username/Email") },
-                    singleLine = true
+                    label = { Text("Username / Email") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White, RoundedCornerShape(12.dp)),
+                    colors = TextFieldDefaults.textFieldColors(
+                        containerColor = Color.White,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(16.dp))
                 TextField(
                     value = password,
                     onValueChange = { password = it },
                     label = { Text("Password") },
                     singleLine = true,
-                    visualTransformation = PasswordVisualTransformation()
+                    visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        val image = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                        IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                            Icon(imageVector = image, contentDescription = if (isPasswordVisible) "Hide password" else "Show password")
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White, RoundedCornerShape(12.dp)),
+                    colors = TextFieldDefaults.textFieldColors(
+                        containerColor = Color.White,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 )
+                // Password generator button
+                TextButton(
+                    onClick = { password = generateSecurePassword() },
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("Generate Strong Password", style = MaterialTheme.typography.bodySmall, color = DarkOrchid)
+                }
+                // Password strength checker
+                if (password.isNotBlank()) {
+                    val (label, color) = when (passwordStrength) {
+                        PasswordStrength.WEAK -> "Weak" to Color.Red
+                        PasswordStrength.MEDIUM -> "Medium" to Color(0xFFFFA000)
+                        PasswordStrength.STRONG -> "Strong" to Color(0xFF4CAF50)
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        LinearProgressIndicator(
+                            progress = when (passwordStrength) {
+                                PasswordStrength.WEAK -> 0.33f
+                                PasswordStrength.MEDIUM -> 0.66f
+                                PasswordStrength.STRONG -> 1f
+                            },
+                            color = color,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(label, color = color, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                if (showError && !isFormValid) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Please fill all fields. Enter a valid username or email.",
+                        color = Color.Red,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.align(Alignment.Start)
+                    )
+                }
+                Spacer(Modifier.height(32.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 32.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            if (isFormValid) {
+                                onEdit(PasswordEntry(id = entry.id, accountType = accountType, username = username, password = password))
+                                isEditing = false
+                            } else {
+                                showError = true
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(28.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = DarkLime, contentColor = BottomSheetBackgroundColor)
+                    ) {
+                        Text("Save", style = MaterialTheme.typography.titleMedium)
+                    }
+                    Button(
+                        onClick = onDelete,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(28.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = DarkOrchid, contentColor = Color.White)
+                    ) {
+                        Text("Delete")
+                    }
+                }
             } else {
                 Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
                     Text("Account Type", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
@@ -338,37 +620,33 @@ fun PasswordDetailsBottomSheet(
                 }
             }
             Spacer(Modifier.height(24.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Button(
-                    onClick = {
-                        if (isEditing) {
-                            onEdit(PasswordEntry(id = entry.id, accountType = accountType, username = username, password = password))
-                            isEditing = false
-                        } else {
-                            isEditing = true
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isEditing) DarkLime else DarkOrchid,
-                        contentColor = if (isEditing) BottomSheetBackgroundColor else Color.White,
-                    )
+            if (!isEditing) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text(if (isEditing) "Save" else "Edit")
-                }
-                Spacer(Modifier.width(16.dp))
-                Button(
-                    onClick = onDelete,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFF44336),
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text("Delete")
+                    Button(
+                        onClick = { isEditing = true },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = DarkLime,
+                            contentColor = BottomSheetBackgroundColor
+                        )
+                    ) {
+                        Text("Edit", style = MaterialTheme.typography.titleMedium)
+                    }
+                    Button(
+                        onClick = onDelete,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = DarkOrchid,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text("Delete")
+                    }
                 }
             }
         }

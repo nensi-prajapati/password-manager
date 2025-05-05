@@ -40,7 +40,7 @@ android {
         compose = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.10" // use version that matches your Compose BOM
+        kotlinCompilerExtensionVersion = "1.5.10"
     }
 }
 
@@ -64,6 +64,7 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     implementation(libs.lifecycle.viewmodel.compose)
-    kapt(libs.room.compiler) // 👈 REQUIRED
+    kapt(libs.room.compiler)
+    implementation("androidx.compose.material:material-icons-extended")
 
 }
