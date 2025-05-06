@@ -1,9 +1,12 @@
 package com.example.passwordmanager
 
+import AuthGate
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -57,12 +60,18 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 
 
 val MainBackgroundColor = Color(0xFF121212)
@@ -72,17 +81,40 @@ val SoftLime = Color(0x73243328)
 val DarkLime = Color(0xFFE6F809)
 val DarkOrchid = Color(0xFFCF94F0)
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity(){
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             PasswordManagerTheme {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    containerColor = MainBackgroundColor
-                ) { innerPadding ->
-                    MainScreen(modifier = Modifier.padding(innerPadding))
+                var isAuthenticated by rememberSaveable { mutableStateOf(false) }
+                var showPinScreen by rememberSaveable { mutableStateOf(false) }
+                var isFirstTime by rememberSaveable { mutableStateOf(true) }
+
+                when {
+                    isAuthenticated -> {
+                        // Show the main app screen inside a scaffold after authentication
+                        Scaffold(
+                            modifier = Modifier.fillMaxSize(),
+                            containerColor = MainBackgroundColor
+                        ) { innerPadding ->
+                            MainScreen(modifier = Modifier.padding(innerPadding))
+                        }
+                    }
+
+                    showPinScreen -> {
+                        // Show fallback PIN screen
+                        PinScreen(onPinCorrect = { isAuthenticated = true })
+                    }
+
+                    else -> {
+                        // Start biometric authentication gate
+                        AuthGate(
+                            activity = this,
+                            onAuthenticated = { isAuthenticated = true },
+                            onPinFallback = { showPinScreen = true }
+                        )
+                    }
                 }
             }
         }
@@ -333,10 +365,10 @@ fun AddPasswordBottomSheet(
 
             // Password strength meter
             if (password.isNotBlank()) {
-                val (label, color) = when (passwordStrength) {
-                    PasswordStrength.WEAK -> "Weak" to Color.Red
-                    PasswordStrength.MEDIUM -> "Medium" to Color(0xFFFFA000) // Amber
-                    PasswordStrength.STRONG -> "Strong" to Color(0xFF4CAF50) // Green
+                val (label, color, emoji) = when (passwordStrength) {
+                    PasswordStrength.WEAK -> Triple("Weak", Color.Red, "❌")
+                    PasswordStrength.MEDIUM -> Triple("Medium", Color(0xFFFFA000), "⚠️")
+                    PasswordStrength.STRONG -> Triple("Strong", Color(0xFF4CAF50), "✅")
                 }
 
                 Row(
@@ -356,7 +388,7 @@ fun AddPasswordBottomSheet(
                             .clip(RoundedCornerShape(4.dp))
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(label, color = color, style = MaterialTheme.typography.bodySmall)
+                    Text("$emoji $label", color = color, style = MaterialTheme.typography.bodySmall)
                 }
             }
 
@@ -540,10 +572,10 @@ fun PasswordDetailsBottomSheet(
                 }
                 // Password strength checker
                 if (password.isNotBlank()) {
-                    val (label, color) = when (passwordStrength) {
-                        PasswordStrength.WEAK -> "Weak" to Color.Red
-                        PasswordStrength.MEDIUM -> "Medium" to Color(0xFFFFA000)
-                        PasswordStrength.STRONG -> "Strong" to Color(0xFF4CAF50)
+                    val (label, color, emoji) = when (passwordStrength) {
+                        PasswordStrength.WEAK -> Triple("Weak", Color.Red, "❌")
+                        PasswordStrength.MEDIUM -> Triple("Medium", Color(0xFFFFA000), "⚠️")
+                        PasswordStrength.STRONG -> Triple("Strong", Color(0xFF4CAF50), "✅")
                     }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -562,7 +594,7 @@ fun PasswordDetailsBottomSheet(
                                 .clip(RoundedCornerShape(4.dp))
                         )
                         Spacer(Modifier.width(8.dp))
-                        Text(label, color = color, style = MaterialTheme.typography.bodySmall)
+                        Text("$emoji $label", color = color, style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 if (showError && !isFormValid) {

@@ -54,6 +54,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.appcompat)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -66,5 +67,5 @@ dependencies {
     implementation(libs.lifecycle.viewmodel.compose)
     kapt(libs.room.compiler)
     implementation("androidx.compose.material:material-icons-extended")
-
+    implementation ("androidx.biometric:biometric:1.2.0-alpha05")
 }
