@@ -39,13 +39,22 @@ fun AuthGate(
                 activity,
                 ContextCompat.getMainExecutor(context),
                 object : BiometricPrompt.AuthenticationCallback() {
+
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                         onAuthenticated()
                     }
 
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                        if (errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
-                            onPinFallback()
+                        when (errorCode) {
+                            BiometricPrompt.ERROR_NEGATIVE_BUTTON -> {
+                                onPinFallback()
+                            }
+                            BiometricPrompt.ERROR_LOCKOUT,
+                            BiometricPrompt.ERROR_LOCKOUT_PERMANENT -> {
+                                onPinFallback()
+                            }
+                            else -> {
+                            }
                         }
                     }
                 })
